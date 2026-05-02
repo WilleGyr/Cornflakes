@@ -1,0 +1,1425 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Cornflakes</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --bg:        #0D0D1A;
+    --surface:   #13132A;
+    --header-grad-from: #13132A;
+    --header-grad-to:   #1A1040;
+    --card:      #181830;
+    --border:    #252545;
+    --track:     #1f1f3a;
+    --grid:      #252545;
+    --chart-track:        #3d3d5e;
+    --chart-track-border: #7878A0;
+    --tooltip-bg:     #13132A;
+    --tooltip-border: #252545;
+    --legend-text:    #A8B2D8;
+    --axis-text:      #9999BB;
+    --accent:    #E94560;
+    --accent2:   #4ECDC4;
+    --accent3:   #FFE66D;
+    --accent4:   #A855F7;
+    --accent5:   #38BDF8;
+    --text:      #E8E8F0;
+    --muted:     #6B6B8E;
+    --green:     #4ADE80;
+    --red:       #F87171;
+  }
+
+  [data-theme="light"] {
+    --bg:        #F4F4F8;
+    --surface:   #FFFFFF;
+    --header-grad-from: #FFFFFF;
+    --header-grad-to:   #F0E8FA;
+    --card:      #FFFFFF;
+    --border:    #E2E2EC;
+    --track:     #ECECF2;
+    --grid:      #E2E2EC;
+    --chart-track:        #ECECF2;
+    --chart-track-border: #B0B0C8;
+    --tooltip-bg:     #FFFFFF;
+    --tooltip-border: #D0D0DE;
+    --legend-text:    #2A2A4A;
+    --axis-text:      #5A5A7A;
+    --text:      #1A1A2E;
+    --muted:     #6E6E8C;
+  }
+
+  html { font-size: 14px; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'DM Sans', sans-serif;
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  header {
+    background: linear-gradient(135deg, var(--header-grad-from) 0%, var(--header-grad-to) 100%);
+    border-bottom: 1px solid var(--border);
+    padding: 1.25rem 2.5rem;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+    backdrop-filter: blur(12px);
+  }
+  .logo { display: flex; align-items: center; gap: 0.75rem; }
+  .logo-dot {
+    width: 10px; height: 10px;
+    background: var(--accent);
+    border-radius: 50%;
+    box-shadow: 0 0 12px var(--accent);
+    animation: pulse 2s infinite;
+  }
+  @keyframes pulse {
+    0%,100% { box-shadow: 0 0 12px var(--accent); }
+    50%      { box-shadow: 0 0 24px var(--accent), 0 0 40px #E9456044; }
+  }
+  .logo h1 { font-size: 1.2rem; font-weight: 600; letter-spacing: -0.02em; }
+  .logo span { color: var(--accent); }
+
+  .header-right { display: flex; align-items: center; gap: 1rem; }
+  #load-btn {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 8px;
+    padding: 0.55rem 1.2rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: flex; align-items: center; gap: 0.4rem;
+  }
+  #load-btn:hover { background: #FF6B7A; transform: translateY(-1px); }
+  #file-input { display: none; }
+  #theme-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--text);
+    border-radius: 8px;
+    width: 36px; height: 36px;
+    font-size: 1rem;
+    cursor: pointer;
+    display: flex; align-items: center; justify-content: center;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+  }
+  #theme-btn:hover { border-color: var(--accent); transform: translateY(-1px); }
+  #status-badge {
+    font-size: 0.75rem;
+    color: var(--muted);
+    font-family: 'DM Mono', monospace;
+  }
+
+  /* Filter bar */
+  .filter-bar {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 0.75rem 2.5rem;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 0.5rem;
+  }
+  .filter-bar label { font-size: 0.75rem; color: var(--muted); margin-right: 0.4rem; white-space: nowrap; }
+  .pill-btn {
+    background: transparent;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    border-radius: 999px;
+    padding: 0.3rem 0.85rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.78rem;
+    cursor: pointer;
+    transition: all 0.15s;
+    white-space: nowrap;
+  }
+  .pill-btn:hover { border-color: var(--accent); color: var(--text); }
+  .pill-btn.active {
+    background: var(--accent);
+    border-color: var(--accent);
+    color: white;
+    font-weight: 600;
+  }
+
+  main {
+    padding: 2rem 2.5rem;
+    max-width: 1600px;
+    margin: 0 auto;
+  }
+
+  .section-title {
+    font-size: 0.78rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    font-weight: 600;
+    margin: 2rem 0 0.9rem;
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+  }
+  .section-title::before {
+    content: '';
+    width: 3px; height: 14px;
+    background: var(--accent);
+    border-radius: 2px;
+  }
+  .section-title.s1::before { background: var(--accent2); }
+  .section-title.s2::before { background: var(--accent3); }
+  .section-title.s3::before { background: var(--accent4); }
+  .section-title.s4::before { background: var(--accent5); }
+
+  /* KPI */
+  .kpi-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+    gap: 1rem;
+  }
+  .kpi-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.1rem 1.4rem;
+    position: relative;
+    overflow: hidden;
+    transition: transform 0.2s, border-color 0.2s;
+    animation: fadeUp 0.5s ease both;
+  }
+  .kpi-card:hover { transform: translateY(-2px); border-color: #353560; }
+  .kpi-card::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    border-radius: 14px 14px 0 0;
+  }
+  .kpi-card.c0::before { background: var(--accent); }
+  .kpi-card.c1::before { background: var(--accent2); }
+  .kpi-card.c2::before { background: var(--accent3); }
+  .kpi-card.c3::before { background: var(--accent4); }
+  .kpi-card.c4::before { background: var(--accent5); }
+  .kpi-card.c5::before { background: var(--green); }
+
+  .kpi-label {
+    font-size: 0.85rem;
+    color: var(--muted);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    font-weight: 500;
+    margin-bottom: 0.4rem;
+  }
+  .kpi-value {
+    font-size: 1.9rem;
+    font-weight: 700;
+    letter-spacing: -0.03em;
+    line-height: 1;
+    margin-bottom: 0.3rem;
+  }
+  .kpi-sub { font-size: 0.9rem; color: var(--muted); }
+  .kpi-delta {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.2rem;
+    font-size: 0.85rem;
+    font-weight: 600;
+    padding: 0.2rem 0.5rem;
+    border-radius: 4px;
+    margin-top: 0.4rem;
+  }
+  .kpi-delta.pos { background: #4ADE8020; color: var(--green); }
+  .kpi-delta.neg { background: #F8717120; color: var(--red); }
+
+  .charts-grid {
+    display: grid;
+    grid-template-columns: repeat(12, 1fr);
+    gap: 1.25rem;
+  }
+  .chart-card {
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 1.4rem;
+    animation: fadeUp 0.5s ease both;
+    transition: border-color 0.2s;
+    min-width: 0;
+  }
+  .chart-card:hover { border-color: #353560; }
+  .chart-card.span-12 { grid-column: span 12; }
+  .chart-card.span-8  { grid-column: span 8; }
+  .chart-card.span-6  { grid-column: span 6; }
+  .chart-card.span-4  { grid-column: span 4; }
+
+  .chart-header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    margin-bottom: 1.1rem;
+    gap: 0.5rem;
+  }
+  .chart-title { font-size: 1.2rem; font-weight: 600; letter-spacing: -0.01em; }
+  .chart-subtitle { font-size: 0.95rem; color: var(--muted); margin-top: 0.2rem; }
+  .chart-pill {
+    font-size: 0.85rem;
+    padding: 0.3rem 0.8rem;
+    border-radius: 20px;
+    font-weight: 700;
+    letter-spacing: 0.06em;
+    background: var(--border);
+    color: var(--muted);
+  }
+  .chart-pill.p1 { background: #E9456044; color: var(--accent); }
+  .chart-pill.p2 { background: #4ECDC444; color: var(--accent2); }
+  .chart-pill.p3 { background: #FFE66D44; color: #B8860B; }
+  .chart-pill.p4 { background: #A855F744; color: var(--accent4); }
+  .chart-pill.p5 { background: #38BDF844; color: var(--accent5); }
+  .chart-pill.p6 { background: #4ADE8044; color: var(--green); }
+  [data-theme="light"] .chart-pill.p1 { color: #C03050; }
+  [data-theme="light"] .chart-pill.p2 { color: #1A8077; }
+  [data-theme="light"] .chart-pill.p3 { color: #8A6500; background: #FFE66D88; }
+  [data-theme="light"] .chart-pill.p4 { color: #7B3FCC; }
+  [data-theme="light"] .chart-pill.p5 { color: #1880B8; }
+  [data-theme="light"] .chart-pill.p6 { color: #1F9D52; }
+
+  .chart-wrap { position: relative; height: 300px; }
+  .chart-wrap.tall { height: 380px; }
+  .chart-wrap.xtall { height: 520px; }
+  .chart-wrap.short { height: 220px; }
+
+  /* Empty state */
+  #empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    padding: 5rem 2rem;
+    text-align: center;
+    gap: 1.25rem;
+  }
+  .empty-icon { font-size: 4rem; opacity: 0.3; }
+  #empty-state h2 { font-size: 1.4rem; font-weight: 600; }
+  #empty-state p  { color: var(--muted); max-width: 460px; line-height: 1.6; }
+  .empty-steps { display: flex; flex-direction: column; gap: 0.6rem; margin-top: 0.5rem; }
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    background: var(--card);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 0.75rem 1.25rem;
+    font-size: 0.85rem;
+    width: 360px;
+  }
+  .step-num {
+    width: 26px; height: 26px;
+    background: var(--accent);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
+    font-size: 0.75rem; font-weight: 700;
+    flex-shrink: 0;
+  }
+
+  footer {
+    text-align: center;
+    padding: 2rem;
+    color: var(--muted);
+    font-size: 0.72rem;
+    border-top: 1px solid var(--border);
+    margin-top: 3rem;
+  }
+
+  @keyframes fadeUp {
+    from { opacity: 0; transform: translateY(16px); }
+    to   { opacity: 1; transform: translateY(0); }
+  }
+
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+  @media (max-width: 1100px) {
+    .chart-card.span-8  { grid-column: span 12; }
+    .chart-card.span-6  { grid-column: span 12; }
+    .chart-card.span-4  { grid-column: span 6; }
+  }
+  @media (max-width: 700px) {
+    .chart-card.span-4  { grid-column: span 12; }
+    main { padding: 1.25rem; }
+    header { padding: 1rem 1.25rem; }
+    .filter-bar { padding: 0.6rem 1rem; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo">
+    <div class="logo-dot"></div>
+    <h1><span>Cornflakes</span></h1>
+  </div>
+  <div class="header-right">
+    <span id="status-badge">Ingen fil laddad</span>
+    <button id="load-btn" onclick="document.getElementById('file-input').click()">📂 Ladda Excel-fil</button>
+    <input type="file" id="file-input" accept=".xlsx,.xls" onchange="loadFile(this)">
+    <button id="theme-btn" onclick="toggleTheme()" title="Växla mörkt/ljust tema">🌙</button>
+  </div>
+</header>
+
+<div class="filter-bar" id="filter-bar" style="display:none">
+  <label>RÅDGIVARE:</label>
+  <button class="pill-btn active" data-advisor="all" onclick="selectAdvisor('all', this)">Alla</button>
+  <span id="advisor-pills"></span>
+</div>
+
+<main>
+  <div id="empty-state">
+    <div class="empty-icon">📊</div>
+    <h2>Cornflakes</h2>
+    <p>Ladda din <strong>CornflakesData.xlsx</strong> (ifylld) för att se interaktiva grafer för Möten, Cross Selling, Nya Kunder, Budget, MR, B2B, V2, LV och SO.</p>
+    <div class="empty-steps">
+      <div class="step"><div class="step-num">1</div> Öppna <strong>CornflakesData.xlsx</strong> och fyll i siffrorna</div>
+      <div class="step"><div class="step-num">2</div> Spara filen (Cmd+S / Ctrl+S)</div>
+      <div class="step"><div class="step-num">3</div> Klicka "Ladda Excel-fil" och välj filen</div>
+    </div>
+  </div>
+
+  <div id="dashboard" style="display:none">
+
+    <div class="kpi-grid" id="kpi-grid"></div>
+
+    <!-- Budget (general — hidden when single advisor selected) -->
+    <section id="sec-budget">
+      <div class="section-title">Budget &amp; Omsättning (ackumulerad)</div>
+      <div class="charts-grid">
+        <div class="chart-card span-8" id="card-budget">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Budget vs Omsättning</div>
+              <div class="chart-subtitle">Ackumulerad budget och omsättning över året</div>
+            </div>
+            <span class="chart-pill p1">BUDGET</span>
+          </div>
+          <div class="chart-wrap tall"><canvas id="budgetChart"></canvas></div>
+        </div>
+
+        <div class="chart-card span-4" id="card-result">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Resultat ackumulerat</div>
+              <div class="chart-subtitle">Ackumulerat resultat jämfört med målet</div>
+            </div>
+            <span class="chart-pill p3">RESULTAT</span>
+          </div>
+          <div class="chart-wrap tall"><canvas id="resultChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Möten -->
+    <section id="sec-moten">
+      <div class="section-title s1">Möten</div>
+      <div class="charts-grid">
+        <div class="chart-card span-12" id="card-moten">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Möten per Rådgivare</div>
+              <div class="chart-subtitle">Antal möten, individ-protokoll, företags-protokoll och V2 i möte</div>
+            </div>
+            <span class="chart-pill p2">MÖTEN</span>
+          </div>
+          <div class="chart-wrap xtall"><canvas id="motenChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Cross Selling + Nya Kunder -->
+    <section id="sec-cross-nya">
+      <div class="section-title s2">Cross Selling &amp; Nya Kunder</div>
+      <div class="charts-grid">
+        <div class="chart-card span-6" id="card-cross">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Cross Selling — Skickade</div>
+              <div class="chart-subtitle">Skickade mot helårsbudget — färg baserad på proportionell budget</div>
+            </div>
+            <span class="chart-pill p3">CROSS</span>
+          </div>
+          <div class="chart-wrap tall"><canvas id="crossChart"></canvas></div>
+        </div>
+        <div class="chart-card span-6" id="card-nya">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Nya Kunder per Rådgivare</div>
+              <div class="chart-subtitle">Antal nya kunder</div>
+            </div>
+            <span class="chart-pill p6">NYA</span>
+          </div>
+          <div class="chart-wrap tall"><canvas id="nyaChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- MR / B2B / V2 / LV / SO per advisor -->
+    <section id="sec-categories">
+      <div class="section-title s4">Per Kategori &amp; Rådgivare</div>
+      <div class="charts-grid">
+        <div class="chart-card span-6" id="card-mr">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Modern Redovisning — Värde vs Budget</div>
+              <div class="chart-subtitle">Värde mot helårsbudget — färg baserad på proportionell budget</div>
+            </div>
+            <span class="chart-pill p1">Modern Redovisning</span>
+          </div>
+          <div class="chart-wrap"><canvas id="mrChart"></canvas></div>
+        </div>
+
+        <div class="chart-card span-6" id="card-b2b">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">B2B — Värde vs Budget</div>
+              <div class="chart-subtitle">Värde mot helårsbudget — färg baserad på proportionell budget</div>
+            </div>
+            <span class="chart-pill p2">B2B</span>
+          </div>
+          <div class="chart-wrap"><canvas id="b2bChart"></canvas></div>
+        </div>
+
+        <div class="chart-card span-6" id="card-v2">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">V2 — Värde vs Budget</div>
+              <div class="chart-subtitle">Värde mot helårsbudget — färg baserad på proportionell budget</div>
+            </div>
+            <span class="chart-pill p3">V2</span>
+          </div>
+          <div class="chart-wrap"><canvas id="v2Chart"></canvas></div>
+        </div>
+
+        <div class="chart-card span-6" id="card-lv">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Löneväxling — Värde vs Budget</div>
+              <div class="chart-subtitle">Värde mot helårsbudget — färg baserad på proportionell budget</div>
+            </div>
+            <span class="chart-pill p4">Löneväxling</span>
+          </div>
+          <div class="chart-wrap"><canvas id="lvChart"></canvas></div>
+        </div>
+
+        <div class="chart-card span-12" id="card-so">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Flytt — Värde vs Budget</div>
+              <div class="chart-subtitle">Värde mot helårsbudget — färg baserad på proportionell budget</div>
+            </div>
+            <span class="chart-pill p5">Flytt</span>
+          </div>
+          <div class="chart-wrap"><canvas id="soChart"></canvas></div>
+        </div>
+
+        <!-- Combined progress for a single advisor -->
+        <div class="chart-card span-12" id="card-combined" style="display:none">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Alla kategorier — % av Budget</div>
+              <div class="chart-subtitle">Andel av helårsbudget — färg baserad på proportionell budget</div>
+            </div>
+            <span class="chart-pill p4">PROGRESS</span>
+          </div>
+          <div class="chart-wrap tall"><canvas id="combinedChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+  </div>
+</main>
+
+<footer>Cornflakes — Lokal fil, ingen internetuppkoppling krävs — Ladda Excel-filen för att uppdatera</footer>
+
+<script>
+const MONTHS = ["Januari","Februari","Mars","April","Maj","Juni","Juli","Augusti","September","Oktober","November","December"];
+const MONTHS_SHORT = ["Jan","Feb","Mar","Apr","Maj","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
+
+const SECTIONS = {
+  moten:    { header: 'Möten',         cols: ['Antal möten','Individ-protokoll','Företags-protokoll','V2 i möte'] },
+  cross:    { header: 'Cross Selling', cols: ['Budget','Totalt Skickade'] },
+  nya:      { header: 'Nya Kunder',    cols: ['Antal nya kunder'] },
+  budget:   { header: 'Budget',        cols: ['Budget ackumulerad','Omsättning','Omsättning ackumulerad','Resultat mål','Resultat','Resultat 2'] },
+  mr:       { header: 'Modern Redovisning',            cols: ['Värde','Budget'] },
+  b2b:      { header: 'B2B',           cols: ['Värde','Budget'] },
+  v2:       { header: 'V2',            cols: ['Värde','Budget'] },
+  lv:       { header: 'Löneväxling',            cols: ['Värde','Budget'] },
+  so:       { header: 'Flytt',            cols: ['Värde','Budget'] },
+};
+
+let DATA = {};
+let activeAdvisor = 'all';
+let charts = {};
+
+window.addEventListener('DOMContentLoaded', () => {
+  applyTheme(localStorage.getItem('cornflakesTheme') || 'light');
+  const saved     = localStorage.getItem('salesDashboardDataV2');
+  const savedName = localStorage.getItem('salesDashboardFileNameV2') || 'CornflakesData.xlsx';
+  if (saved) {
+    try {
+      DATA = JSON.parse(saved);
+      showDashboard('✅ ' + savedName);
+    } catch(e) { localStorage.removeItem('salesDashboardDataV2'); }
+  }
+});
+
+function showDashboard(statusText) {
+  document.getElementById('status-badge').textContent = statusText;
+  document.getElementById('empty-state').style.display = 'none';
+  document.getElementById('dashboard').style.display  = 'block';
+  document.getElementById('filter-bar').style.display = 'flex';
+  buildAdvisorPills();
+  renderAll();
+}
+
+function loadFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('status-badge').textContent = '⏳ Läser…';
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const wb = XLSX.read(e.target.result, { type: 'array' });
+      const ws = wb.Sheets["Data"] || wb.Sheets[wb.SheetNames[0]];
+      if (!ws) { alert("Hittade inte fliken 'Data' i filen."); return; }
+      parseSheet(ws);
+      localStorage.setItem('salesDashboardDataV2', JSON.stringify(DATA));
+      localStorage.setItem('salesDashboardFileNameV2', file.name);
+      showDashboard('✅ ' + file.name);
+    } catch(err) {
+      alert("Kunde inte läsa filen: " + err.message);
+      console.error(err);
+    }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function parseSheet(ws) {
+  const range = XLSX.utils.decode_range(ws['!ref']);
+  const get = (r, c) => {
+    const cell = ws[XLSX.utils.encode_cell({ r, c })];
+    if (!cell) return null;
+    const v = cell.v;
+    if (v === '' || v === undefined) return null;
+    return v;
+  };
+  const headerToKey = {};
+  for (const k in SECTIONS) headerToKey[SECTIONS[k].header.toLowerCase()] = k;
+
+  DATA = {};
+  let r = range.s.r;
+  while (r <= range.e.r) {
+    const a = get(r, 0);
+    const aStr = a == null ? '' : String(a).trim();
+    const key = headerToKey[aStr.toLowerCase()];
+    if (!key) { r++; continue; }
+
+    const colHeaderRow = r + 1;
+    const colMap = {};
+    const sectionCols = SECTIONS[key].cols;
+
+    const seen = [];
+    for (let c = 1; c <= 12; c++) {
+      const h = get(colHeaderRow, c);
+      if (h == null) break;
+      seen.push(String(h).trim());
+    }
+    seen.forEach((label, idx) => {
+      const target = sectionCols[idx] || label;
+      colMap[target] = idx + 1;
+    });
+
+    const rows = [];
+    let rr = colHeaderRow + 1;
+    while (rr <= range.e.r) {
+      const name = get(rr, 0);
+      if (name == null || String(name).trim() === '') break;
+      if (headerToKey[String(name).trim().toLowerCase()]) break;
+      const values = {};
+      for (const cn in colMap) {
+        const v = get(rr, colMap[cn]);
+        values[cn] = (typeof v === 'number') ? v : (v == null ? null : (isNaN(parseFloat(v)) ? v : parseFloat(v)));
+      }
+      rows.push({ name: String(name).trim(), values });
+      rr++;
+    }
+    DATA[key] = { rows };
+    r = rr;
+  }
+}
+
+// ── ADVISORS ─────────────────────────────────────────────────────
+function allAdvisors() {
+  const set = new Set();
+  ['moten','cross','nya','mr','b2b','v2','lv','so'].forEach(k => {
+    (DATA[k]?.rows || []).forEach(row => set.add(row.name));
+  });
+  return Array.from(set);
+}
+
+function buildAdvisorPills() {
+  const wrap = document.getElementById('advisor-pills');
+  if (!wrap) return;
+  const names = allAdvisors().sort((a,b) => a.localeCompare(b, 'sv'));
+  wrap.innerHTML = names.map(n =>
+    `<button class="pill-btn" data-advisor="${escapeHtml(n)}" onclick="selectAdvisor('${escapeJs(n)}', this)">${escapeHtml(n)}</button>`
+  ).join('');
+}
+
+function selectAdvisor(name, btn) {
+  activeAdvisor = name;
+  document.querySelectorAll('.filter-bar .pill-btn[data-advisor]').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  renderAll();
+}
+
+function rowsForSection(key) {
+  const rows = DATA[key]?.rows || [];
+  if (activeAdvisor === 'all') return rows;
+  return rows.filter(r => r.name === activeAdvisor);
+}
+
+// ── HELPERS ──────────────────────────────────────────────────────
+function fmtKr(v) {
+  if (v == null || isNaN(v)) return '—';
+  return (Math.abs(v) >= 1000000
+    ? (v/1000000).toFixed(1) + 'm'
+    : Math.abs(v) >= 1000
+    ? (v/1000).toFixed(0) + 't'
+    : Math.round(v).toLocaleString('sv-SE')) + ' kr';
+}
+function fmtNum(v) {
+  if (v == null || isNaN(v)) return '—';
+  return Math.round(v).toLocaleString('sv-SE');
+}
+function fmtPct(v) {
+  if (v == null || isNaN(v)) return '—';
+  return v.toFixed(0) + '%';
+}
+function sumCol(rows, col) {
+  return rows.reduce((a, r) => a + (Number(r.values[col]) || 0), 0);
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeJs(s)   { return String(s).replace(/'/g, "\\'"); }
+function setVisible(id, vis) {
+  const el = document.getElementById(id);
+  if (el) el.style.display = vis ? '' : 'none';
+}
+
+// Senaste månaden där "Omsättning" är ifylld (inte null, inte 0).
+// Ackumulerade kolumner ignoreras eftersom Excel-formler ofta ger 0 även för tomma månader.
+function getLatestOmsIdx() {
+  const budRows = DATA.budget?.rows || [];
+  for (let i = budRows.length - 1; i >= 0; i--) {
+    const om = budRows[i]?.values['Omsättning'];
+    if (om != null && !isNaN(om) && om !== 0) return i;
+  }
+  return -1;
+}
+function getMonthsPassed() {
+  const idx = getLatestOmsIdx();
+  return idx >= 0 ? idx + 1 : 12;
+}
+function getMonthShort(idx) {
+  return (idx >= 0 && idx < 12) ? MONTHS_SHORT[idx] : null;
+}
+
+// ── KPIs ─────────────────────────────────────────────────────────
+function renderKPIs() {
+  const grid = document.getElementById('kpi-grid');
+
+  if (activeAdvisor === 'all') {
+    const budRows = DATA.budget?.rows || [];
+
+    // "Hittills" = senaste månaden där Omsättning är ifylld (per-månad, inte 0)
+    const latestIdx = getLatestOmsIdx();
+    // Ackumulerad omsättning t.o.m. den månaden (använd kolumnen om finns, annars summera)
+    let currentOmsAck = null;
+    if (latestIdx >= 0) {
+      currentOmsAck = budRows[latestIdx].values['Omsättning ackumulerad'];
+      if (currentOmsAck == null) currentOmsAck = sumCol(budRows.slice(0, latestIdx + 1), 'Omsättning');
+    }
+    // Ackumulerad budget t.o.m. samma månad
+    const expectedBudAck = latestIdx >= 0 ? (budRows[latestIdx].values['Budget ackumulerad'] ?? null) : null;
+    // Helårsbudget = sista ifyllda Budget ackumulerad
+    let yearEndBud = null;
+    for (let i = budRows.length - 1; i >= 0; i--) {
+      if (budRows[i]?.values['Budget ackumulerad'] != null) { yearEndBud = budRows[i].values['Budget ackumulerad']; break; }
+    }
+    const monthShort = getMonthShort(latestIdx);
+    const pace = (expectedBudAck && currentOmsAck != null) ? (currentOmsAck / expectedBudAck) * 100 : null;
+
+    // Resultat ackumulerat hittills och proportionellt mål t.o.m. samma månad
+    let cumRes = 0, cumMal = 0;
+    if (latestIdx >= 0) {
+      for (let i = 0; i <= latestIdx; i++) {
+        cumRes += Number(budRows[i]?.values['Resultat']) || 0;
+        cumMal += Number(budRows[i]?.values['Resultat mål']) || 0;
+      }
+    }
+    const resPace = (cumMal && latestIdx >= 0) ? (cumRes / cumMal) * 100 : null;
+
+    // Total antal möten (summan av "Antal möten" över alla rådgivare)
+    const motenRows = rowsForSection('moten');
+    const totalMoten = sumCol(motenRows, 'Antal möten');
+    const advisorCount = motenRows.length;
+
+    // Nya kunder totalt
+    const nyaRows = rowsForSection('nya');
+    const totalNya = sumCol(nyaRows, 'Antal nya kunder');
+    const nyaCount = nyaRows.length;
+
+    const kpis = [
+      { label: 'Omsättning hittills',
+        value: fmtKr(currentOmsAck ?? 0),
+        sub: expectedBudAck != null
+              ? `Förväntat: ${fmtKr(expectedBudAck)}${monthShort ? ' (t.o.m. ' + monthShort + ')' : ''}`
+              : 'Ingen förväntan',
+        delta: pace, cls: 'c0' },
+      { label: 'Resultat hittills',
+        value: fmtKr(cumRes),
+        sub: latestIdx >= 0 && cumMal
+              ? `Mål: ${fmtKr(cumMal)}${monthShort ? ' (t.o.m. ' + monthShort + ')' : ''}`
+              : 'Ingen data',
+        delta: resPace, cls: 'c1' },
+      { label: 'Total antal möten',
+        value: fmtNum(totalMoten),
+        sub: advisorCount ? `${advisorCount} rådgivare` : 'Ingen data',
+        cls: 'c2' },
+      { label: 'Nya kunder totalt',
+        value: fmtNum(totalNya),
+        sub: nyaCount ? `${(totalNya/nyaCount).toFixed(1)} i snitt per rådgivare` : 'Ingen data',
+        cls: 'c3' },
+    ];
+    grid.innerHTML = kpis.map(k => `
+      <div class="kpi-card ${k.cls}">
+        <div class="kpi-label">${k.label}</div>
+        <div class="kpi-value">${k.value}</div>
+        <div class="kpi-sub">${k.sub}</div>
+        ${k.delta != null ? `<div class="kpi-delta ${k.delta>=100?'pos':'neg'}">${k.delta>=100?'▲':'▼'} ${Math.abs(k.delta-100).toFixed(0)}% ${k.delta>=100?'över':'under'}</div>` : ''}
+      </div>
+    `).join('');
+    return;
+  }
+
+  // Per-advisor KPI: Värde + % of budget for each category they're in
+  const cats = [
+    { key: 'mr',  label: 'Modern Redovisning',  cls: 'c0' },
+    { key: 'b2b', label: 'B2B', cls: 'c1' },
+    { key: 'v2',  label: 'V2',  cls: 'c2' },
+    { key: 'lv',  label: 'Löneväxling',  cls: 'c3' },
+    { key: 'so',  label: 'Flytt',  cls: 'c4' },
+  ];
+  const cards = [];
+  const factor = getMonthsPassed() / 12;
+  cats.forEach(c => {
+    const row = (DATA[c.key]?.rows || []).find(r => r.name === activeAdvisor);
+    if (!row) return;
+    const v = Number(row.values['Värde']) || 0;
+    const b = Number(row.values['Budget']) || 0;
+    const expected = b * factor;
+    const pace = expected ? (v/expected)*100 : null;
+    cards.push({
+      label: c.label, value: fmtKr(v),
+      sub: b ? `Budget: ${fmtKr(b)}` : 'Ingen budget',
+      delta: pace, cls: c.cls
+    });
+  });
+  // Cross selling KPI for this advisor
+  const crossRow = (DATA.cross?.rows || []).find(r => r.name === activeAdvisor);
+  if (crossRow) {
+    const v = Number(crossRow.values['Totalt Skickade']) || 0;
+    const b = Number(crossRow.values['Budget']) || 0;
+    const expected = b * factor;
+    const pace = expected ? (v/expected)*100 : null;
+    cards.push({
+      label: 'Cross Selling', value: fmtNum(v),
+      sub: b ? `Budget: ${fmtNum(b)}` : 'Ingen budget',
+      delta: pace, cls: 'c5'
+    });
+  }
+  if (!cards.length) {
+    grid.innerHTML = `<div class="kpi-card c0"><div class="kpi-label">${escapeHtml(activeAdvisor)}</div><div class="kpi-value">—</div><div class="kpi-sub">Ingen data</div></div>`;
+    return;
+  }
+  grid.innerHTML = cards.map(k => `
+    <div class="kpi-card ${k.cls}">
+      <div class="kpi-label">${k.label}</div>
+      <div class="kpi-value">${k.value}</div>
+      <div class="kpi-sub">${k.sub}</div>
+      ${k.delta != null ? `<div class="kpi-delta ${k.delta>=100?'pos':'neg'}">${k.delta>=100?'▲':'▼'} ${Math.abs(k.delta-100).toFixed(0)}% ${k.delta>=100?'över':'under'}</div>` : ''}
+    </div>
+  `).join('');
+}
+
+// ── CHART DEFAULTS ───────────────────────────────────────────────
+Chart.defaults.font.family = "'DM Sans', sans-serif";
+Chart.defaults.font.size = 13;
+function cssVar(name) {
+  return getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+}
+let gridColor   = '#252545';
+let trackColor  = '#3d3d5e';
+let legendText  = '#A8B2D8';
+let axisText    = '#9999BB';
+let tooltipBg   = '#13132A';
+let tooltipBd   = '#252545';
+
+function refreshThemeColors() {
+  gridColor  = cssVar('--grid')          || gridColor;
+  trackColor = cssVar('--chart-track')   || trackColor;
+  legendText = cssVar('--legend-text')   || legendText;
+  axisText   = cssVar('--axis-text')     || axisText;
+  tooltipBg  = cssVar('--tooltip-bg')    || tooltipBg;
+  tooltipBd  = cssVar('--tooltip-border')|| tooltipBd;
+  Chart.defaults.color = axisText;
+}
+
+function applyTheme(theme) {
+  if (theme === 'light') document.documentElement.setAttribute('data-theme', 'light');
+  else                   document.documentElement.removeAttribute('data-theme');
+  const btn = document.getElementById('theme-btn');
+  if (btn) btn.textContent = theme === 'light' ? '🌙' : '☀️';
+  refreshThemeColors();
+  if (Object.keys(charts).length > 0) renderAll();
+}
+
+function toggleTheme() {
+  const current = document.documentElement.getAttribute('data-theme') === 'light' ? 'light' : 'dark';
+  const next = current === 'light' ? 'dark' : 'light';
+  localStorage.setItem('cornflakesTheme', next);
+  applyTheme(next);
+}
+
+// Initiera tema direkt så CSS-vars läses korrekt
+refreshThemeColors();
+
+function makeChart(id, config) {
+  if (charts[id]) charts[id].destroy();
+  const ctx = document.getElementById(id);
+  if (!ctx) return;
+  config.options = config.options || {};
+  config.options.responsive = true;
+  config.options.maintainAspectRatio = false;
+  config.options.plugins = config.options.plugins || {};
+  config.options.plugins.tooltip = Object.assign({
+    backgroundColor: tooltipBg,
+    borderColor: tooltipBd,
+    borderWidth: 1,
+    titleColor: cssVar('--text') || '#E8E8F0',
+    bodyColor: legendText,
+    padding: 10,
+    cornerRadius: 8,
+    boxPadding: 4,
+  }, config.options.plugins.tooltip || {});
+  charts[id] = new Chart(ctx, config);
+}
+
+function baseScales(opts = {}) {
+  const { kr = false, pct = false, stacked = false, indexAxis = 'x', unit = 't' } = opts;
+  const tickFmt = v => {
+    if (kr) {
+      if (unit === 'm') {
+        const m = v / 1000000;
+        return (m === Math.floor(m) ? m : m.toFixed(1)) + 'm';
+      }
+      return Math.abs(v) >= 1000 ? (v/1000).toFixed(0)+'t' : v;
+    }
+    return pct ? v + '%' : v;
+  };
+  const valueAxis = { grid: { color: gridColor }, ticks: { color: axisText, callback: tickFmt }, stacked };
+  const labelAxis = { grid: { color: gridColor, display: false }, ticks: { color: axisText }, stacked };
+  return indexAxis === 'y' ? { x: valueAxis, y: labelAxis } : { x: labelAxis, y: valueAxis };
+}
+
+// ── BUDGET (hela året — omsättning bara t.o.m. hittills) ─────────
+function renderBudgetChart() {
+  const rows = DATA.budget?.rows || [];
+  const latestIdx = getLatestOmsIdx();
+
+  // Alla 12 månader på x-axeln
+  const labels = rows.map(r => {
+    const idx = MONTHS.findIndex(x => x.toLowerCase() === String(r.name).toLowerCase());
+    return idx >= 0 ? MONTHS_SHORT[idx] : r.name;
+  });
+  // Budget ackumulerad för hela året
+  const budAck = rows.map(r => r.values['Budget ackumulerad'] ?? null);
+
+  // Omsättning ackumulerad — bara t.o.m. senaste ifyllda månad, annars null (linjen bryts)
+  let cum = 0;
+  const omsAck = rows.map((r, i) => {
+    cum += Number(r.values['Omsättning']) || 0;
+    if (latestIdx < 0 || i > latestIdx) return null;
+    const v = r.values['Omsättning ackumulerad'];
+    return (v != null && !isNaN(v) && v !== 0) ? v : cum;
+  });
+
+  // Punktfärg: grön när omsättning > budget den månaden, annars accent
+  const pointBg = omsAck.map((o, i) => (o != null && budAck[i] != null && o > budAck[i]) ? '#4ADE80' : '#E94560');
+
+  makeChart('budgetChart', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Omsättning ackumulerad',
+          data: omsAck,
+          borderColor: '#E94560',
+          backgroundColor: '#E9456022',
+          borderWidth: 2.5,
+          tension: 0.35,
+          pointBackgroundColor: pointBg,
+          pointBorderColor: pointBg,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          fill: true,
+        },
+        {
+          label: 'Budget ackumulerad',
+          data: budAck,
+          borderColor: '#4ECDC4',
+          borderDash: [6, 4],
+          backgroundColor: 'transparent',
+          borderWidth: 2.5,
+          tension: 0.2,
+          pointBackgroundColor: '#4ECDC4',
+          pointRadius: 4,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: legendText, boxWidth: 12 } },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmtKr(ctx.parsed.y)}` } }
+      },
+      scales: baseScales({ kr: true, unit: 'm' })
+    }
+  });
+}
+
+// ── RESULTAT ackumulerat — mål hela året, resultat bara hittills ─
+function renderResultChart() {
+  const rows = DATA.budget?.rows || [];
+  const latestIdx = getLatestOmsIdx();
+
+  const labels = rows.map(r => {
+    const idx = MONTHS.findIndex(x => x.toLowerCase() === String(r.name).toLowerCase());
+    return idx >= 0 ? MONTHS_SHORT[idx] : r.name;
+  });
+
+  // Mål ackumulerat för hela året
+  let cumMal = 0;
+  const malAck = rows.map(r => {
+    cumMal += Number(r.values['Resultat mål']) || 0;
+    return cumMal;
+  });
+
+  // Resultat ackumulerat — bara t.o.m. senaste ifyllda månad
+  let cumRes = 0;
+  const resAck = rows.map((r, i) => {
+    cumRes += Number(r.values['Resultat']) || 0;
+    return (latestIdx < 0 || i > latestIdx) ? null : cumRes;
+  });
+
+  // Punktfärg: grön när resultat ack > mål ack
+  const pointBg = resAck.map((r, i) => (r != null && malAck[i] != null && r > malAck[i]) ? '#4ADE80' : '#E94560');
+
+  makeChart('resultChart', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [
+        {
+          label: 'Resultat (ack.)',
+          data: resAck,
+          borderColor: '#E94560',
+          backgroundColor: '#E9456022',
+          borderWidth: 2.5,
+          tension: 0.35,
+          pointBackgroundColor: pointBg,
+          pointBorderColor: pointBg,
+          pointRadius: 5,
+          pointHoverRadius: 7,
+          fill: true,
+        },
+        {
+          label: 'Mål (ack.)',
+          data: malAck,
+          borderColor: '#FFE66D',
+          borderDash: [4, 4],
+          backgroundColor: 'transparent',
+          borderWidth: 2,
+          tension: 0.2,
+          pointBackgroundColor: '#FFE66D',
+          pointRadius: 3,
+          fill: false,
+        }
+      ]
+    },
+    options: {
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { labels: { color: legendText, boxWidth: 12 } },
+        tooltip: { callbacks: { label: ctx => `${ctx.dataset.label}: ${fmtKr(ctx.parsed.y)}` } }
+      },
+      scales: baseScales({ kr: true, unit: 'm' })
+    }
+  });
+}
+
+// ── MÖTEN ────────────────────────────────────────────────────────
+function renderMotenChart() {
+  const rows = rowsForSection('moten');
+  const labels  = rows.map(r => r.name);
+  const totals  = rows.map(r => Number(r.values['Antal möten']) || 0);
+  const individ = rows.map(r => Number(r.values['Individ-protokoll']) || 0);
+  const foretag = rows.map(r => Number(r.values['Företags-protokoll']) || 0);
+  const v2met   = rows.map(r => Number(r.values['V2 i möte']) || 0);
+  // V2 är del av Individ-protokoll → Individ-segmentet visar bara den del som inte är V2.
+  // V2 ritas först (vid stapelns början) så det visuellt ligger "över" början av Individ.
+  const individOnly = rows.map((_, i) => Math.max(0, individ[i] - v2met[i]));
+  const remainders  = rows.map((_, i) => Math.max(0, totals[i] - (individ[i] + foretag[i])));
+
+  makeChart('motenChart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'V2 i möte',          data: v2met,       backgroundColor: '#FFE66DAA', borderColor: '#FFE66D', borderWidth: 1.5, borderRadius: 4, stack: 's' },
+        { label: 'Individ-protokoll',  data: individOnly, backgroundColor: '#4ECDC4AA', borderColor: '#4ECDC4', borderWidth: 1.5, borderRadius: 4, stack: 's' },
+        { label: 'Företags-protokoll', data: foretag,     backgroundColor: '#A855F7AA', borderColor: '#A855F7', borderWidth: 1.5, borderRadius: 4, stack: 's' },
+        { label: 'Antal möten',        data: remainders,  backgroundColor: '#E9456033', borderColor: '#E9456088', borderWidth: 1.5, borderRadius: 4, stack: 's' },
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      interaction: { mode: 'y', intersect: false },
+      plugins: {
+        legend: { labels: { color: legendText, boxWidth: 12 } },
+        tooltip: {
+          callbacks: {
+            title: ctx => {
+              const i = ctx[0].dataIndex;
+              return `${labels[i] || ''} — ${fmtNum(totals[i])} möten`;
+            },
+            label: ctx => {
+              const i = ctx.dataIndex;
+              // Skippa "remainder"-segmentet — totalen står redan i titeln
+              if (ctx.datasetIndex === 3) return null;
+              // Individ-protokoll: visa det fulla antalet (inkl. V2-delen)
+              if (ctx.datasetIndex === 1) return `Individ-protokoll: ${fmtNum(individ[i])}`;
+              return `${ctx.dataset.label}: ${fmtNum(ctx.parsed.x)}`;
+            }
+          }
+        }
+      },
+      scales: baseScales({ stacked: true, indexAxis: 'y' })
+    }
+  });
+}
+
+// ── NYA KUNDER ───────────────────────────────────────────────────
+function renderNyaChart() {
+  const rows = rowsForSection('nya');
+  const labels = rows.map(r => r.name);
+  const data = rows.map(r => r.values['Antal nya kunder'] ?? 0);
+  makeChart('nyaChart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Antal nya kunder',
+        data,
+        backgroundColor: '#4ADE8055',
+        borderColor: '#4ADE80',
+        borderWidth: 2,
+        borderRadius: 5,
+      }]
+    },
+    options: {
+      indexAxis: 'y',
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `${ctx.parsed.x} nya kunder` } }
+      },
+      scales: baseScales({ indexAxis: 'y' })
+    }
+  });
+}
+
+// ── PROGRESS BAR (en stapel per rådgivare) ───────────────────────
+// Jämförs mot PROPORTIONELL budget = budget × (månader hittills / 12)
+// Stack: Uppnått (capped vid 100%) + Över (>100%) + Kvar (resten upp till 100%)
+// Färg på "Uppnått": röd <80%, gul 80–99%, grön ≥100%.
+function renderProgressChart(canvasId, sectionKey, color, valCol, budCol, unitFmt) {
+  const rows = rowsForSection(sectionKey);
+  const labels = rows.map(r => r.name);
+  const monthsPassed = getMonthsPassed();
+  const factor = monthsPassed / 12;
+
+  const data = rows.map(r => {
+    // Negativt värde räknas som 0 så budgetstapeln inte kompenserar
+    const v = Math.max(0, Number(r.values[valCol]) || 0);
+    const b = Number(r.values[budCol]) || 0;
+    const expected = b * factor;
+    const pctTotal = b ? v / b * 100 : null;            // stapelns längd → mot helårsbudget
+    const pace     = expected ? v / expected * 100 : null; // färg → mot proportionell budget
+    return { v, b, expected, pctTotal, pace };
+  });
+
+  // Stapeln visar faktiska värden (kr eller antal), inte procent
+  const achieved  = data.map(d => Math.min(d.v, d.b));
+  const over      = data.map(d => Math.max(0, d.v - d.b));
+  const remaining = data.map(d => Math.max(0, d.b - d.v));
+
+  const fillBg = data.map(d => {
+    if (d.pace == null) return '#33335588';
+    if (d.pace >= 100) return '#4ADE80CC';
+    if (d.pace >= 80)  return '#FFE66DCC';
+    return '#F87171CC';
+  });
+  const fillBorder = data.map(d => {
+    if (d.pace == null) return '#444466';
+    if (d.pace >= 100) return '#4ADE80';
+    if (d.pace >= 80)  return '#FFE66D';
+    return '#F87171';
+  });
+
+  makeChart(canvasId, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Uppnått',          data: achieved,  backgroundColor: fillBg,      borderColor: fillBorder, borderWidth: 1.5, borderRadius: 6, stack: 's' },
+        { label: 'Över budget',      data: over,      backgroundColor: '#4ADE8077', borderColor: '#4ADE80',  borderWidth: 1.5, borderRadius: 6, stack: 's' },
+        { label: 'Kvar till budget', data: remaining, backgroundColor: trackColor, borderColor: '#7878A0',  borderWidth: 1.5, borderRadius: 6, stack: 's' },
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      interaction: { mode: 'y', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: ctx => {
+              const d = data[ctx[0].dataIndex];
+              const pctStr = d.pctTotal == null ? '—' : d.pctTotal.toFixed(0) + '%';
+              return `${labels[ctx[0].dataIndex]} — ${pctStr} av budget`;
+            },
+            label: ctx => {
+              const d = data[ctx.dataIndex];
+              if (ctx.datasetIndex === 0) return `Värde: ${unitFmt(d.v)}`;
+              if (ctx.datasetIndex === 1) {
+                if (d.pctTotal != null && d.pctTotal > 100) return `Över: ${unitFmt(d.v - d.b)}`;
+                return null;
+              }
+              return `Budget: ${unitFmt(d.b)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: {
+          stacked: true,
+          min: 0,
+          grid: { color: gridColor },
+          ticks: {
+            color: axisText,
+            callback: v => {
+              if (unitFmt === fmtKr) {
+                const abs = Math.abs(v);
+                if (abs >= 1000000) return (v/1000000).toFixed(1) + 'm';
+                if (abs >= 1000)    return (v/1000).toFixed(0) + 't';
+              }
+              return Math.round(v).toLocaleString('sv-SE');
+            }
+          }
+        },
+        y: { stacked: true, grid: { display: false }, ticks: { color: axisText } }
+      }
+    }
+  });
+}
+
+// ── COMBINED PROGRESS (single advisor) ──────────────────────────
+// Jämförs mot proportionell budget × (månader hittills / 12).
+function renderCombinedProgressForAdvisor() {
+  // Ordningen matchar KPI-korten (MR, B2B, V2, Löneväxling, Flytt, Cross Selling)
+  const cats = [
+    { key: 'mr',    label: 'Modern Redovisning', valCol: 'Värde',           budCol: 'Budget', fmt: fmtKr  },
+    { key: 'b2b',   label: 'B2B',                valCol: 'Värde',           budCol: 'Budget', fmt: fmtKr  },
+    { key: 'v2',    label: 'V2',                 valCol: 'Värde',           budCol: 'Budget', fmt: fmtKr  },
+    { key: 'lv',    label: 'Löneväxling',        valCol: 'Värde',           budCol: 'Budget', fmt: fmtKr  },
+    { key: 'so',    label: 'Flytt',              valCol: 'Värde',           budCol: 'Budget', fmt: fmtKr  },
+    { key: 'cross', label: 'Cross Selling',      valCol: 'Totalt Skickade', budCol: 'Budget', fmt: fmtNum },
+  ];
+  const monthsPassed = getMonthsPassed();
+  const factor = monthsPassed / 12;
+
+  const items = [];
+  cats.forEach(c => {
+    const row = (DATA[c.key]?.rows || []).find(r => r.name === activeAdvisor);
+    if (!row) return;
+    // Negativt värde räknas som 0 så budgetstapeln inte kompenserar
+    const v = Math.max(0, Number(row.values[c.valCol]) || 0);
+    const b = Number(row.values[c.budCol]) || 0;
+    const expected = b * factor;
+    const pctTotal = b ? v / b * 100 : null;
+    const pace     = expected ? v / expected * 100 : null;
+    items.push({ ...c, v, b, expected, pctTotal, pace });
+  });
+  if (!items.length) return;
+
+  const labels = items.map(c => c.label);
+  // % av helårsbudget (eftersom kategorierna har olika enheter)
+  const achieved  = items.map(c => c.pctTotal == null ? 0 : Math.min(c.pctTotal, 100));
+  const over      = items.map(c => c.pctTotal == null ? 0 : Math.max(0, c.pctTotal - 100));
+  const remaining = items.map(c => c.pctTotal == null ? 0 : Math.max(0, 100 - c.pctTotal));
+
+  const fillBg = items.map(c => {
+    if (c.pace == null) return '#33335588';
+    if (c.pace >= 100) return '#4ADE80CC';
+    if (c.pace >= 80)  return '#FFE66DCC';
+    return '#F87171CC';
+  });
+  const fillBorder = items.map(c => {
+    if (c.pace == null) return '#444466';
+    if (c.pace >= 100) return '#4ADE80';
+    if (c.pace >= 80)  return '#FFE66D';
+    return '#F87171';
+  });
+  const maxPct = Math.max(105, ...items.map(c => c.pctTotal == null ? 0 : c.pctTotal + 5));
+
+  makeChart('combinedChart', {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [
+        { label: 'Uppnått',          data: achieved,  backgroundColor: fillBg,        borderColor: fillBorder, borderWidth: 1.5, borderRadius: 6, stack: 's' },
+        { label: 'Över budget',      data: over,      backgroundColor: '#4ADE8077',   borderColor: '#4ADE80',  borderWidth: 1.5, borderRadius: 6, stack: 's' },
+        { label: 'Kvar till budget', data: remaining, backgroundColor: trackColor,    borderColor: '#2a2a48',  borderWidth: 1,   borderRadius: 6, stack: 's' },
+      ]
+    },
+    options: {
+      indexAxis: 'y',
+      interaction: { mode: 'y', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: ctx => {
+              const c = items[ctx[0].dataIndex];
+              return `${c.label} — ${c.pctTotal == null ? '—' : c.pctTotal.toFixed(0) + '%'} av budget`;
+            },
+            label: ctx => {
+              const c = items[ctx.dataIndex];
+              if (ctx.datasetIndex === 0) return `Värde: ${c.fmt(c.v)}`;
+              if (ctx.datasetIndex === 1) {
+                if (c.pctTotal != null && c.pctTotal > 100) return `Över: ${c.fmt(c.v - c.b)}`;
+                return null;
+              }
+              return `Budget: ${c.fmt(c.b)}`;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, min: 0, max: maxPct, grid: { color: gridColor }, ticks: { color: axisText, callback: v => v + '%' } },
+        y: { stacked: true, grid: { display: false }, ticks: { color: axisText } }
+      }
+    }
+  });
+}
+
+// ── RENDER ALL ───────────────────────────────────────────────────
+function renderAll() {
+  renderKPIs();
+
+  const isAll = activeAdvisor === 'all';
+
+  // Budget section — endast i "Alla"
+  setVisible('sec-budget', isAll);
+  if (isAll) {
+    renderBudgetChart();
+    renderResultChart();
+  }
+
+  // Möten — endast i "Alla"-vyn
+  const motenRows = rowsForSection('moten');
+  const showMoten = isAll && motenRows.length > 0;
+  setVisible('sec-moten', showMoten);
+  if (showMoten) renderMotenChart();
+
+  // Cross & Nya — endast i "Alla" (Cross ingår i kombinerad graf, Nya finns i KPI)
+  if (isAll) {
+    const crossRows = rowsForSection('cross');
+    const nyaRows   = rowsForSection('nya');
+    setVisible('card-cross', crossRows.length > 0);
+    setVisible('card-nya',   nyaRows.length > 0);
+    setVisible('sec-cross-nya', crossRows.length || nyaRows.length);
+    if (crossRows.length) renderProgressChart('crossChart', 'cross', '#FFE66D', 'Totalt Skickade', 'Budget', fmtNum);
+    if (nyaRows.length)   renderNyaChart();
+  } else {
+    setVisible('sec-cross-nya', false);
+  }
+
+  // Categories
+  const catCfg = [
+    { card:'card-mr',  canvas:'mrChart',  key:'mr',  color:'#E94560' },
+    { card:'card-b2b', canvas:'b2bChart', key:'b2b', color:'#4ECDC4' },
+    { card:'card-v2',  canvas:'v2Chart',  key:'v2',  color:'#FFE66D' },
+    { card:'card-lv',  canvas:'lvChart',  key:'lv',  color:'#A855F7' },
+    { card:'card-so',  canvas:'soChart',  key:'so',  color:'#38BDF8' },
+  ];
+
+  if (isAll) {
+    let any = false;
+    catCfg.forEach(c => {
+      const rows = rowsForSection(c.key);
+      setVisible(c.card, rows.length > 0);
+      if (rows.length) {
+        any = true;
+        renderProgressChart(c.canvas, c.key, c.color, 'Värde', 'Budget', fmtKr);
+      }
+    });
+    setVisible('card-combined', false);
+    setVisible('sec-categories', any);
+  } else {
+    catCfg.forEach(c => setVisible(c.card, false));
+    const hasAny = ['cross','mr','b2b','v2','lv','so'].some(k =>
+      (DATA[k]?.rows || []).some(r => r.name === activeAdvisor)
+    );
+    setVisible('card-combined', hasAny);
+    setVisible('sec-categories', hasAny);
+    if (hasAny) renderCombinedProgressForAdvisor();
+  }
+}
+</script>
+</body>
+</html>
