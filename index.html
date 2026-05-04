@@ -26,6 +26,7 @@
     --tooltip-border: #252545;
     --legend-text:    #A8B2D8;
     --axis-text:      #9999BB;
+    --threshold-line: #FFE66D;
     --accent:    #E94560;
     --accent2:   #4ECDC4;
     --accent3:   #FFE66D;
@@ -52,6 +53,7 @@
     --tooltip-border: #D0D0DE;
     --legend-text:    #2A2A4A;
     --axis-text:      #5A5A7A;
+    --threshold-line: #B8860B;
     --text:      #1A1A2E;
     --muted:     #6E6E8C;
   }
@@ -431,6 +433,32 @@
       </div>
     </section>
 
+    <!-- Pension & WM -->
+    <section id="sec-pension-wm">
+      <div class="charts-grid">
+        <div class="chart-card span-6" id="card-pension">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">Pension</div>
+              <div class="chart-subtitle">Månadsvärde i procent — grön ≥ 5%</div>
+            </div>
+            <span class="chart-pill p4">PENSION</span>
+          </div>
+          <div class="chart-wrap tall"><canvas id="pensionChart"></canvas></div>
+        </div>
+        <div class="chart-card span-6" id="card-wm">
+          <div class="chart-header">
+            <div>
+              <div class="chart-title">WM</div>
+              <div class="chart-subtitle">Värde delat på 2 per månad</div>
+            </div>
+            <span class="chart-pill p5">WM</span>
+          </div>
+          <div class="chart-wrap tall"><canvas id="wmChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
     <!-- Möten -->
     <section id="sec-moten">
       <div class="section-title s1">Möten</div>
@@ -482,10 +510,10 @@
         <div class="chart-card span-6" id="card-mr">
           <div class="chart-header">
             <div>
-              <div class="chart-title">Modern Rådgivning — Värde vs Budget</div>
+              <div class="chart-title">Modern Redovisning — Värde vs Budget</div>
               <div class="chart-subtitle">Värde mot helårsbudget — färg baserad på proportionell budget</div>
             </div>
-            <span class="chart-pill p1">Modern Rådgivning</span>
+            <span class="chart-pill p1">Modern Redovisning</span>
           </div>
           <div class="chart-wrap"><canvas id="mrChart"></canvas></div>
         </div>
@@ -562,11 +590,13 @@ const SECTIONS = {
   cross:    { header: 'Cross Selling', cols: ['Budget','Totalt Skickade'] },
   nya:      { header: 'Nya Kunder',    cols: ['Antal nya kunder'] },
   budget:   { header: 'Budget',        cols: ['Budget ackumulerad','Omsättning','Omsättning ackumulerad','Resultat mål','Resultat','Resultat 2'] },
-  mr:       { header: 'Modern Rådgivning',            cols: ['Värde','Budget'] },
+  mr:       { header: 'Modern Redovisning',            cols: ['Värde','Budget'] },
   b2b:      { header: 'B2B',           cols: ['Värde','Budget'] },
   v2:       { header: 'V2',            cols: ['Värde','Budget'] },
   lv:       { header: 'Löneväxling',            cols: ['Värde','Budget'] },
   so:       { header: 'Flytt',            cols: ['Värde','Budget'] },
+  pension:  { header: 'Pension',       cols: ['Värde'] },
+  wm:       { header: 'WM',            cols: ['Värde'] },
 };
 
 let DATA = {};
@@ -1092,6 +1122,147 @@ function renderResultChart() {
   });
 }
 
+// ── PENSION (månad → procent, grön ≥ 5%) ────────────────────────
+function renderPensionChart() {
+  const rows = DATA.pension?.rows || [];
+  const labels = MONTHS_SHORT.slice();
+  const data = Array(12).fill(null);
+  rows.forEach(r => {
+    const idx = MONTHS.findIndex(m => m.toLowerCase() === String(r.name).toLowerCase());
+    if (idx < 0) return;
+    const v = Number(r.values['Värde']);
+    // 0 räknas som tomt — linjen bryts
+    if (v != null && !isNaN(v) && v !== 0) data[idx] = v * 100;
+  });
+  const pointBg = data.map(v => v == null ? '#E94560' : (v >= 5 ? '#4ADE80' : '#E94560'));
+
+  // Streckad referenslinje vid 5%
+  const thresholdLine = {
+    id: 'pensionThreshold',
+    afterDraw(chart) {
+      const yScale = chart.scales.y;
+      if (!yScale) return;
+      const y = yScale.getPixelForValue(5);
+      const { left, right } = chart.chartArea;
+      const ctx = chart.ctx;
+      const color = cssVar('--threshold-line') || '#FFE66D';
+      ctx.save();
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.setLineDash([6, 4]);
+      ctx.beginPath();
+      ctx.moveTo(left, y);
+      ctx.lineTo(right, y);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      ctx.fillStyle = color;
+      ctx.font = '700 12px DM Sans, sans-serif';
+      ctx.textAlign = 'right';
+      ctx.textBaseline = 'bottom';
+      ctx.fillText('5% mål', right - 6, y - 4);
+      ctx.restore();
+    }
+  };
+
+  makeChart('pensionChart', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'Pension',
+        data,
+        borderColor: '#A855F7',
+        backgroundColor: '#A855F722',
+        borderWidth: 2.5,
+        tension: 0.35,
+        pointBackgroundColor: pointBg,
+        pointBorderColor: pointBg,
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        fill: true,
+      }]
+    },
+    plugins: [thresholdLine],
+    options: {
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `Pension: ${ctx.parsed.y.toFixed(1)}%` } }
+      },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: axisText } },
+        y: { grid: { color: gridColor }, ticks: { color: axisText, callback: v => v + '%' }, beginAtZero: true, suggestedMax: 10 }
+      }
+    }
+  });
+}
+
+// ── WM (månad → värde / 2) ───────────────────────────────────────
+function renderWMChart() {
+  const rows = DATA.wm?.rows || [];
+  const labels = MONTHS_SHORT.slice();
+  const data = Array(12).fill(null);
+  rows.forEach(r => {
+    const idx = MONTHS.findIndex(m => m.toLowerCase() === String(r.name).toLowerCase());
+    if (idx < 0) return;
+    const v = Number(r.values['Värde']);
+    // 0 räknas som tomt — linjen bryts
+    if (v != null && !isNaN(v) && v !== 0) data[idx] = v / 2;
+  });
+
+  // Datalabels ovanför varje punkt
+  const dataLabels = {
+    id: 'wmDataLabels',
+    afterDatasetsDraw(chart) {
+      const ctx = chart.ctx;
+      const ds = chart.data.datasets[0];
+      const meta = chart.getDatasetMeta(0);
+      ctx.save();
+      ctx.fillStyle = legendText;
+      ctx.font = '600 11px DM Sans, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'bottom';
+      meta.data.forEach((point, i) => {
+        const v = ds.data[i];
+        if (v == null) return;
+        ctx.fillText(fmtKr(v), point.x, point.y - 10);
+      });
+      ctx.restore();
+    }
+  };
+
+  makeChart('wmChart', {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        label: 'WM',
+        data,
+        borderColor: '#38BDF8',
+        backgroundColor: '#38BDF822',
+        borderWidth: 2.5,
+        tension: 0.35,
+        pointBackgroundColor: '#38BDF8',
+        pointBorderColor: '#38BDF8',
+        pointRadius: 5,
+        pointHoverRadius: 7,
+        fill: true,
+      }]
+    },
+    plugins: [dataLabels],
+    options: {
+      layout: { padding: { top: 24 } },
+      plugins: {
+        legend: { display: false },
+        tooltip: { callbacks: { label: ctx => `WM: ${fmtKr(ctx.parsed.y)}` } }
+      },
+      scales: {
+        x: { grid: { color: gridColor }, ticks: { color: axisText } },
+        y: { grid: { color: gridColor }, ticks: { color: axisText, callback: v => Math.abs(v) >= 1000 ? (v/1000).toFixed(0)+'t' : v }, beginAtZero: true }
+      }
+    }
+  });
+}
+
 // ── MÖTEN ────────────────────────────────────────────────────────
 function renderMotenChart() {
   const rows = rowsForSection('moten');
@@ -1368,6 +1539,13 @@ function renderAll() {
   if (isAll) {
     renderBudgetChart();
     renderResultChart();
+  }
+
+  // Pension & WM — endast i "Alla"-vyn
+  setVisible('sec-pension-wm', isAll);
+  if (isAll) {
+    renderPensionChart();
+    renderWMChart();
   }
 
   // Möten — endast i "Alla"-vyn
