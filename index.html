@@ -525,10 +525,10 @@
         <div class="chart-card span-6" id="card-mr">
           <div class="chart-header">
             <div>
-              <div class="chart-title">Modern Redovisning — Värde vs Budget</div>
+              <div class="chart-title">Modern Rådgivning — Värde vs Budget</div>
               <div class="chart-subtitle">Värde mot helårsbudget — färg baserad på proportionell budget</div>
             </div>
-            <span class="chart-pill p1">Modern Redovisning</span>
+            <span class="chart-pill p1">Modern Rådgivning</span>
           </div>
           <div class="chart-wrap"><canvas id="mrChart"></canvas></div>
         </div>
@@ -605,7 +605,7 @@ const SECTIONS = {
   cross:    { header: 'Cross Selling', cols: ['Budget','Totalt Skickade'] },
   nya:      { header: 'Nya Kunder',    cols: ['Antal nya kunder'] },
   budget:   { header: 'Budget',        cols: ['Budget ackumulerad','Omsättning','Omsättning ackumulerad','Resultat mål','Resultat','Resultat 2'] },
-  mr:       { header: 'Modern Redovisning',            cols: ['Värde','Budget'] },
+  mr:       { header: 'Modern Rådgivning',            cols: ['Värde','Budget'] },
   b2b:      { header: 'B2B',           cols: ['Värde','Budget'] },
   v2:       { header: 'V2',            cols: ['Värde','Budget'] },
   lv:       { header: 'Löneväxling',            cols: ['Värde','Budget'] },
@@ -987,7 +987,7 @@ function renderKPIs() {
 
   // Per-advisor KPI: Värde + % of budget for each category they're in
   const cats = [
-    { key: 'mr',  label: 'Modern Redovisning',  cls: 'c0' },
+    { key: 'mr',  label: 'Modern Rådgivning',  cls: 'c0' },
     { key: 'b2b', label: 'B2B', cls: 'c1' },
     { key: 'v2',  label: 'V2',  cls: 'c2' },
     { key: 'lv',  label: 'Löneväxling',  cls: 'c3' },
@@ -1574,7 +1574,7 @@ function renderProgressChart(canvasId, sectionKey, color, valCol, budCol, unitFm
 function renderCombinedProgressForAdvisor() {
   // Ordningen matchar KPI-korten (MR, B2B, V2, Löneväxling, Flytt, Cross Selling)
   const cats = [
-    { key: 'mr',    label: 'Modern Redovisning', valCol: 'Värde',           budCol: 'Budget', fmt: fmtKr  },
+    { key: 'mr',    label: 'Modern Rådgivning', valCol: 'Värde',           budCol: 'Budget', fmt: fmtKr  },
     { key: 'b2b',   label: 'B2B',                valCol: 'Värde',           budCol: 'Budget', fmt: fmtKr  },
     { key: 'v2',    label: 'V2',                 valCol: 'Värde',           budCol: 'Budget', fmt: fmtKr  },
     { key: 'lv',    label: 'Löneväxling',        valCol: 'Värde',           budCol: 'Budget', fmt: fmtKr  },
