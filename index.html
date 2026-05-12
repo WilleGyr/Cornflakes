@@ -110,6 +110,20 @@
   }
   #load-btn:hover { background: #FF6B7A; transform: translateY(-1px); }
   #file-input { display: none; }
+  #refresh-btn {
+    background: transparent;
+    color: var(--text);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 0.55rem 1rem;
+    font-family: 'DM Sans', sans-serif;
+    font-size: 0.85rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    display: none; align-items: center; gap: 0.4rem;
+  }
+  #refresh-btn:hover { border-color: var(--accent); transform: translateY(-1px); }
   #theme-btn {
     background: transparent;
     border: 1px solid var(--border);
@@ -377,7 +391,8 @@
   </div>
   <div class="header-right">
     <span id="status-badge">Ingen fil laddad</span>
-    <button id="load-btn" onclick="document.getElementById('file-input').click()">📂 Ladda Excel-fil</button>
+    <button id="refresh-btn" onclick="refreshFromHandle()" title="Läs om senaste filen från disk">🔄 Uppdatera</button>
+    <button id="load-btn" onclick="pickFile()">📂 Ladda Excel-fil</button>
     <input type="file" id="file-input" accept=".xlsx,.xls" onchange="loadFile(this)">
     <button id="theme-btn" onclick="toggleTheme()" title="Växla mörkt/ljust tema">🌙</button>
   </div>
@@ -603,6 +618,52 @@ let DATA = {};
 let activeAdvisor = 'all';
 let charts = {};
 
+// ---- Persistent file handle (File System Access API) ----
+const FH_DB = 'cornflakes';
+const FH_STORE = 'kv';
+const FH_KEY = 'fileHandle';
+const FS_ACCESS_SUPPORTED = typeof window !== 'undefined' && 'showOpenFilePicker' in window;
+
+function idbOpen() {
+  return new Promise((resolve, reject) => {
+    const req = indexedDB.open(FH_DB, 1);
+    req.onupgradeneeded = () => req.result.createObjectStore(FH_STORE);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+async function idbGet(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const req = db.transaction(FH_STORE, 'readonly').objectStore(FH_STORE).get(key);
+    req.onsuccess = () => resolve(req.result);
+    req.onerror   = () => reject(req.error);
+  });
+}
+async function idbPut(key, value) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FH_STORE, 'readwrite');
+    tx.objectStore(FH_STORE).put(value, key);
+    tx.oncomplete = () => resolve();
+    tx.onerror    = () => reject(tx.error);
+  });
+}
+async function idbDel(key) {
+  const db = await idbOpen();
+  return new Promise((resolve, reject) => {
+    const tx = db.transaction(FH_STORE, 'readwrite');
+    tx.objectStore(FH_STORE).delete(key);
+    tx.oncomplete = () => resolve();
+    tx.onerror    = () => reject(tx.error);
+  });
+}
+
+function setRefreshButtonVisible(visible) {
+  const btn = document.getElementById('refresh-btn');
+  if (btn) btn.style.display = visible ? 'flex' : 'none';
+}
+
 window.addEventListener('DOMContentLoaded', () => {
   applyTheme(localStorage.getItem('cornflakesTheme') || 'light');
   const saved     = localStorage.getItem('salesDashboardDataV2');
@@ -613,7 +674,27 @@ window.addEventListener('DOMContentLoaded', () => {
       showDashboard('✅ ' + savedName);
     } catch(e) { localStorage.removeItem('salesDashboardDataV2'); }
   }
+  tryAutoReload();
 });
+
+async function tryAutoReload() {
+  if (!FS_ACCESS_SUPPORTED) return;
+  let handle;
+  try { handle = await idbGet(FH_KEY); } catch { return; }
+  if (!handle) return;
+  setRefreshButtonVisible(true);
+  let perm;
+  try { perm = await handle.queryPermission({ mode: 'read' }); }
+  catch { perm = 'prompt'; }
+  if (perm === 'granted') {
+    try {
+      const file = await handle.getFile();
+      await readAndParseFile(file);
+    } catch (err) {
+      console.warn('Automatisk omläsning misslyckades:', err);
+    }
+  }
+}
 
 function showDashboard(statusText) {
   document.getElementById('status-badge').textContent = statusText;
@@ -624,26 +705,76 @@ function showDashboard(statusText) {
   renderAll();
 }
 
+async function pickFile() {
+  if (FS_ACCESS_SUPPORTED) {
+    try {
+      const [handle] = await window.showOpenFilePicker({
+        types: [{
+          description: 'Excel-fil',
+          accept: { 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet': ['.xlsx', '.xls'] }
+        }],
+        multiple: false,
+      });
+      try { await idbPut(FH_KEY, handle); } catch (e) { console.warn('Kunde inte spara fil-handtag:', e); }
+      const file = await handle.getFile();
+      await readAndParseFile(file);
+      setRefreshButtonVisible(true);
+    } catch (err) {
+      if (err && err.name !== 'AbortError') {
+        alert('Kunde inte öppna filen: ' + err.message);
+        console.error(err);
+      }
+    }
+  } else {
+    document.getElementById('file-input').click();
+  }
+}
+
+async function refreshFromHandle() {
+  let handle;
+  try { handle = await idbGet(FH_KEY); } catch { handle = null; }
+  if (!handle) { setRefreshButtonVisible(false); return; }
+  let perm;
+  try { perm = await handle.queryPermission({ mode: 'read' }); }
+  catch { perm = 'prompt'; }
+  if (perm !== 'granted') {
+    try { perm = await handle.requestPermission({ mode: 'read' }); }
+    catch { perm = 'denied'; }
+  }
+  if (perm !== 'granted') {
+    document.getElementById('status-badge').textContent = '⚠️ Åtkomst nekad';
+    return;
+  }
+  try {
+    const file = await handle.getFile();
+    await readAndParseFile(file);
+  } catch (err) {
+    alert('Kunde inte läsa filen: ' + err.message);
+    console.error(err);
+  }
+}
+
+async function readAndParseFile(file) {
+  document.getElementById('status-badge').textContent = '⏳ Läser…';
+  try {
+    const buf = await file.arrayBuffer();
+    const wb = XLSX.read(buf, { type: 'array' });
+    const ws = wb.Sheets["Data"] || wb.Sheets[wb.SheetNames[0]];
+    if (!ws) { alert("Hittade inte fliken 'Data' i filen."); return; }
+    parseSheet(ws);
+    localStorage.setItem('salesDashboardDataV2', JSON.stringify(DATA));
+    localStorage.setItem('salesDashboardFileNameV2', file.name);
+    showDashboard('✅ ' + file.name);
+  } catch (err) {
+    alert("Kunde inte läsa filen: " + err.message);
+    console.error(err);
+  }
+}
+
 function loadFile(input) {
   const file = input.files[0];
   if (!file) return;
-  document.getElementById('status-badge').textContent = '⏳ Läser…';
-  const reader = new FileReader();
-  reader.onload = e => {
-    try {
-      const wb = XLSX.read(e.target.result, { type: 'array' });
-      const ws = wb.Sheets["Data"] || wb.Sheets[wb.SheetNames[0]];
-      if (!ws) { alert("Hittade inte fliken 'Data' i filen."); return; }
-      parseSheet(ws);
-      localStorage.setItem('salesDashboardDataV2', JSON.stringify(DATA));
-      localStorage.setItem('salesDashboardFileNameV2', file.name);
-      showDashboard('✅ ' + file.name);
-    } catch(err) {
-      alert("Kunde inte läsa filen: " + err.message);
-      console.error(err);
-    }
-  };
-  reader.readAsArrayBuffer(file);
+  readAndParseFile(file);
 }
 
 function parseSheet(ws) {

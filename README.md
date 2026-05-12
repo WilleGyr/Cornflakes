@@ -6,7 +6,14 @@ Interaktiv dashboard som visualiserar försäljnings- och rådgivardata från et
 
 Klicka **"Ladda Excel-fil"** i headern och välj ett ifyllt Excel-ark som följer formatet nedan. Datan cacheas i webbläsaren så den finns kvar nästa gång du besöker sidan.
 
-För att uppdatera siffrorna: spara nya värden i Excel och klicka "Ladda Excel-fil" igen.
+### Kom-ihåg-fil (auto-uppdatering)
+
+I Chrome och Edge minns appen vilken fil du senast valde via [File System Access API](https://developer.mozilla.org/en-US/docs/Web/API/File_System_Access_API):
+
+- **Vid sidladdning** läses filen om automatiskt om webbläsaren fortfarande har läsbehörighet (t.ex. efter F5 i samma session). Spara nya värden i Excel, refresha, klart.
+- **🔄 Uppdatera-knappen** i headern dyker upp så fort en fil är ihågkommen. Ett klick läser om filen direkt — utan att öppna filväljaren. Efter omstart av webbläsaren visar webbläsaren en liten "Tillåt åtkomst?"-bekräftelse första gången, sen är behörigheten tillbaka.
+
+Allt sker lokalt; inga filer skickas någonstans. I Safari och Firefox saknas API:et, så där fungerar appen som tidigare: klicka "Ladda Excel-fil" varje gång du vill ladda om.
 
 ## Funktioner
 
@@ -45,4 +52,4 @@ För Budget-sektionen är raderna månader (`Januari` … `December`).
 
 ## Integritet
 
-Hela appen är klient-side. Excel-filen läses i webbläsaren via `FileReader`-API:et, parsas av `xlsx.js`, och datan sparas bara i din egen `localStorage`. Inga nätverksanrop görs till någon backend.
+Hela appen är klient-side. Excel-filen läses i webbläsaren via `FileReader`- eller File System Access-API:et, parsas av `xlsx.js`, och datan sparas bara i din egen `localStorage` (parsad data) och `IndexedDB` (fil-handtag i Chrome/Edge). Inga nätverksanrop görs till någon backend — fungerar likadant på GitHub Pages som vid lokal `file://`-körning.
